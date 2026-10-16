@@ -6,6 +6,7 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { emailQueue } from './queue/emailQueue';
 import { config } from './config';
+import { authenticate } from './middleware/auth';
 import authRoutes from './routes/auth.routes';
 import senderRoutes from './routes/sender.routes';
 import emailRoutes from './routes/email.routes';
@@ -31,7 +32,7 @@ app.use(cookieParser(config.SESSION_SECRET));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Setup Bull-Board dashboard at /admin/queues
+// Setup Bull-Board dashboard at /admin/queues with session authentication protection
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
@@ -40,7 +41,17 @@ createBullBoard({
   serverAdapter,
 });
 
-app.use('/admin/queues', serverAdapter.getRouter());
+app.use(
+  '/admin/queues',
+  authenticate,
+  (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).send('Unauthorized. Authentication required to access BullMQ Queue Dashboard.');
+    }
+    next();
+  },
+  serverAdapter.getRouter()
+);
 
 // Health Check
 app.get('/health', (req: Request, res: Response) => {
