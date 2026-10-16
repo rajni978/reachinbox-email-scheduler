@@ -1,0 +1,29 @@
+{
+  "name": "reachinbox-email-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade full-stack email scheduling service with BullMQ, Redis, PostgreSQL, Elasticsearch, and Slack integration.",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev:all",
+    "dev:all": "concurrently -n \"API,WORKER,WEB\" -c \"blue,green,magenta\" \"npm run --workspace=backend dev:api\" \"npm run --workspace=backend dev:worker\" \"npm run --workspace=frontend dev\"",
+    "dev:api": "npm run --workspace=backend dev:api",
+    "dev:worker": "npm run --workspace=backend dev:worker",
+    "dev:frontend": "npm run --workspace=frontend dev",
+    "build": "npm run --workspace=backend build && npm run --workspace=frontend build",
+    "test": "npm run --workspace=backend test",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "db:migrate": "npm run --workspace=backend prisma:migrate",
+    "db:generate": "npm run --workspace=backend prisma:generate",
+    "db:studio": "npm run --workspace=backend prisma:studio",
+    "ethereal:setup": "npm run --workspace=backend ethereal:setup"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

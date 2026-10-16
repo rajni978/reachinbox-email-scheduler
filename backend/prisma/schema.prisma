@@ -1,0 +1,133 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  avatarUrl        String?
+  googleId         String?           @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  campaigns        Campaign[]
+  slackConnections SlackConnection[]
+
+  @@map("users")
+}
+
+model Sender {
+  id              String           @id @default(uuid())
+  name            String
+  email           String           @unique
+  host            String
+  port            Int              @default(587)
+  secure          Boolean          @default(false)
+  user            String
+  pass            String
+  isDefault       Boolean          @default(false)
+  hourlyLimit     Int              @default(100)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  campaigns       Campaign[]
+  emailJobs       EmailJob[]
+  rateLimitEvents RateLimitEvent[]
+
+  @@map("senders")
+}
+
+model Campaign {
+  id              String           @id @default(uuid())
+  name            String
+  subject         String
+  body            String
+  scheduledAt     DateTime
+  minDelayMs      Int              @default(2000)
+  hourlyLimit     Int              @default(100)
+  status          String           @default("SCHEDULED")
+  totalEmails     Int              @default(0)
+  sentCount       Int              @default(0)
+  failedCount     Int              @default(0)
+  userId          String?
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  senderId        String
+  sender          Sender           @relation(fields: [senderId], references: [id])
+  emailJobs       EmailJob[]
+  rateLimitEvents RateLimitEvent[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status])
+  @@index([userId])
+  @@map("campaigns")
+}
+
+model EmailJob {
+  id              String           @id @default(uuid())
+  campaignId      String
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  senderId        String
+  sender          Sender           @relation(fields: [senderId], references: [id])
+  recipientEmail  String
+  subject         String
+  body            String
+  status          String           @default("SCHEDULED") // SCHEDULED, PROCESSING, SENT, FAILED, RESCHEDULED
+  bullmqJobId     String?          @unique
+  idempotencyKey  String           @unique
+  attempts        Int              @default(0)
+  maxAttempts     Int              @default(3)
+  lastError       String?
+  scheduledAt     DateTime
+  sentAt          DateTime?
+  messageId       String?
+  etherealUrl     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  rateLimitEvents RateLimitEvent[]
+
+  @@index([status])
+  @@index([senderId, scheduledAt])
+  @@index([campaignId])
+  @@map("email_jobs")
+}
+
+model SlackConnection {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId      String
+  teamName    String?
+  channelId   String
+  channelName String?
+  accessToken String
+  botUserId   String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, teamId, channelId])
+  @@map("slack_connections")
+}
+
+model RateLimitEvent {
+  id            String    @id @default(uuid())
+  senderId      String
+  sender        Sender    @relation(fields: [senderId], references: [id])
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  emailJobId    String?
+  emailJob      EmailJob? @relation(fields: [emailJobId], references: [id], onDelete: SetNull)
+  eventType     String    @default("HOURLY_LIMIT_REACHED")
+  details       String?
+  rescheduledTo DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([senderId, createdAt])
+  @@map("rate_limit_events")
+}
